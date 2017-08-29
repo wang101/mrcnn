@@ -1,0 +1,10 @@
+#!/bin/csh
+
+##$ -M hwang21@nd.edu # Email address for job notification
+##$ -m abe # Se          nd mail when job begins, ends and aborts
+#$ -q gpu         # Specify que        ue
+#$ -N test        # Specify job name
+
+module load tensorflow/1.0-python2
+python train_frcnn.py -o simple -p multilabel.txt > temp2.txt
+
