@@ -6,6 +6,7 @@ import numpy as np
 import pdb
 import sys
 import pickle
+import sklearn.metrics
 from optparse import OptionParser
 import time
 from keras_frcnn import config
@@ -18,7 +19,6 @@ def make_mask(seg, coords, imgshape):
     assert imgshape[-1] == 3
     color = np.random.rand(3)*1.0#0.2
     x1,y1,x2,y2 = coords
-    mask = np.ones((y2-y1,x2-x1,3))
     #pdb.set_trace()
     seg = imresize(seg,(y2-y1,x2-x1),'nearest')
     seg = np.stack(np.array([seg]*3),axis=-1)/255*color
@@ -117,7 +117,9 @@ class_to_color = {class_mapping[v]: np.random.randint(0, 255, 3) for v in class_
 C.num_rois = int(options.num_rois)
 
 if C.network == 'resnet50':
-    num_features = 1024
+    #num_features = 1024
+    #For Res18:256 Res50:1024
+    num_features = 256
 elif C.network == 'vgg':
     num_features = 512
 
@@ -155,6 +157,8 @@ model_rpn.compile(optimizer='sgd', loss='mse')
 model_classifier.compile(optimizer='sgd', loss='mse')
 
 all_imgs = []
+f1_annoall = []
+f1_predall = []
 
 classes = {}
 
@@ -222,8 +226,8 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 continue
 
             if np.max(P_cls[0, ii, :]) < bbox_threshold:
-                if SKIP:
-                    continue
+                #if SKIP:
+                continue
 
             cls_name = class_mapping[np.argmax(P_cls[0, ii, :])]
 
@@ -250,6 +254,15 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
     all_dets = []
 
+    f1_predimg = np.zeros((img.shape[:2]))
+    mask_name = os.path.splitext(img_name.split('/')[-1])[0]+'.png'
+    mask_path = '../keras_my/data/mask_train/'
+    #mask_path = '../keras_my/data/mask_test/'
+    #pdb.set_trace()
+    f1_annoimg = cv2.imread(os.path.join(mask_path,mask_name))
+    f1_annoimg = np.uint8(cv2.cvtColor(f1_annoimg, cv2.COLOR_BGR2GRAY)/100)
+    f1_annoimg = cv2.resize(f1_annoimg,(img.shape[1],img.shape[0]))
+
     for key in bboxes:
         bbox = np.array(bboxes[key])
 
@@ -264,15 +277,16 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
                 real_x1 = 1
             if real_y1 < 1:
                 real_y1 = 1
-            if real_x2 > img.shape[0]:
-                real_x2 = img.shape[0]
-            if real_y2 > img.shape[1]:
-                real_y2 = img.shape[1]
+            if real_x2 > img.shape[1]:
+                real_x2 = img.shape[1]
+            if real_y2 > img.shape[0]:
+                real_y2 = img.shape[0]
 
             real_coords = (real_x1, real_y1, real_x2, real_y2)
             new_mask = make_mask(new_segment_jk,real_coords,img.shape)
             #pdb.set_trace()
             img[real_y1:real_y2,real_x1:real_x2,:] = np.int8(new_mask * img[real_y1:real_y2,real_x1:real_x2,:])
+            f1_predimg[real_y1:real_y2,real_x1:real_x2] += 1-np.int8(np.mean(new_mask[:,:,:],axis=2))
             #img = np.int8(new_mask * img)
 
             cv2.rectangle(img,(real_x1, real_y1), (real_x2, real_y2), (int(class_to_color[key][0]), int(class_to_color[key][1]), int(class_to_color[key][2])),2)
@@ -291,4 +305,12 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
     print(all_dets)
     #cv2.imshow('img', img)
     #cv2.waitKey(0)
-    cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
+    cv2.imwrite('./results_imgs/{}'.format(img_name.split('/')[-1]),img)
+    cv2.imwrite('./results_imgs/{}'.format('anno'+img_name.split('/')[-1]),f1_annoimg*100)
+    cv2.imwrite('./results_imgs/{}'.format('pred'+img_name.split('/')[-1]),f1_predimg*100)
+
+    f1_predimg = np.where(f1_predimg>0,1,0)
+    f1_annoall.extend(f1_annoimg.reshape(-1).tolist())
+    f1_predall.extend(f1_predimg.reshape(-1).tolist())
+    print("f1_score:   ", sklearn.metrics.f1_score(f1_annoimg.reshape(-1), f1_predimg.reshape(-1)))
+print("all_f1_score:   ", sklearn.metrics.f1_score(np.array(f1_annoall),np.array(f1_predall),pos_label=1,average='binary'))

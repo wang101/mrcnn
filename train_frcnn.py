@@ -19,6 +19,8 @@ from keras.utils import generic_utils
 
 sys.setrecursionlimit(40000)
 
+logname = 'trainlog%s.txt'%time.strftime("%b_%d_%H_%M_%S", time.localtime())
+roi_size=14
 parser = OptionParser()
 
 parser.add_option("-p", "--path", dest="train_path", help="Path to training data.")
@@ -119,7 +121,6 @@ else:
 img_input = Input(shape=input_shape_img)
 roi_input = Input(shape=(None, 4))
 #msk_num,roi_size,roi_size
-roi_size=14
 msk_input = Input(shape=(None,roi_size,roi_size))
 
 # define the base network (resnet here, can be VGG, Inception, etc)
@@ -138,8 +139,10 @@ model_all = Model([img_input, roi_input], rpn[:2] + classifier)
 
 try:
     print('loading weights from {}'.format(C.base_net_weights))
-    model_rpn.load_weights(C.base_net_weights, by_name=True)
-    model_classifier.load_weights(C.base_net_weights, by_name=True)
+    model_rpn.load_weights(C.model_path, by_name=True)
+    model_classifier.load_weights(C.model_path, by_name=True)
+    #model_rpn.load_weights(C.base_net_weights, by_name=True)
+    #model_classifier.load_weights(C.base_net_weights, by_name=True)
 except:
     print('Could not load pretrained model weights. Weights can be found in the keras application folder \
         https://github.com/fchollet/keras/tree/master/keras/applications')
@@ -220,7 +223,10 @@ for epoch_num in range(num_epochs):
                 try:
                     selected_neg_samples = np.random.choice(neg_samples, C.num_rois - len(selected_pos_samples), replace=False).tolist()
                 except:
-                    selected_neg_samples = np.random.choice(neg_samples, C.num_rois - len(selected_pos_samples), replace=True).tolist()
+                    try:
+                        selected_neg_samples = np.random.choice(neg_samples, C.num_rois - len(selected_pos_samples), replace=True).tolist()
+                    except:
+                        continue
 
                 sel_samples = selected_pos_samples + selected_neg_samples
             else:
@@ -245,15 +251,15 @@ for epoch_num in range(num_epochs):
 
             iter_num += 1
 
-            progbar.update(iter_num, [('rpn_cls', np.mean(losses[:iter_num, 0])), ('rpn_regr', np.mean(losses[:iter_num, 1])), ('detector_cls', np.mean(losses[:iter_num, 2])), ('detector_regr', np.mean(losses[:iter_num, 3])),('detector_seg',np.mean(losses[:iter_num,5]))])
+            progbar.update(iter_num, [('rpn_cls', np.mean(losses[:iter_num, 0])), ('rpn_regr', np.mean(losses[:iter_num, 1])), ('detector_cls', np.mean(losses[:iter_num, 2])), ('detector_regr', np.mean(losses[:iter_num, 3])),('detector_seg',np.mean(losses[:iter_num,4]))])
 
             if iter_num == epoch_length:
                 loss_rpn_cls = np.mean(losses[:, 0])
                 loss_rpn_regr = np.mean(losses[:, 1])
                 loss_class_cls = np.mean(losses[:, 2])
                 loss_class_regr = np.mean(losses[:, 3])
-                loss_class_seg = np.mean(losses[:,5])
-                class_acc = np.mean(losses[:, 4])
+                loss_class_seg = np.mean(losses[:,4])
+                class_acc = np.mean(losses[:, 5])
 
                 mean_overlapping_bboxes = float(sum(rpn_accuracy_for_epoch)) / len(rpn_accuracy_for_epoch)
                 rpn_accuracy_for_epoch = []
@@ -267,6 +273,16 @@ for epoch_num in range(num_epochs):
                     print('Loss Detector regression: {}'.format(loss_class_regr))
                     print('Loss Detector segmentation: {}'.format(loss_class_seg))
                     print('Elapsed time: {}'.format(time.time() - start_time))
+                with open(logname,'a') as logfile:
+                    logfile.write('Mean number of bounding boxes from RPN overlapping ground truth boxes: {}\n '.format(mean_overlapping_bboxes))
+                    logfile.write('Classifier accuracy for bounding boxes from RPN: {}\n '.format(class_acc))
+                    logfile.write('Loss RPN classifier: {}\n '.format(loss_rpn_cls))
+                    logfile.write('Loss RPN regression: {}\n '.format(loss_rpn_regr))
+                    logfile.write('Loss Detector classifier: {}\n '.format(loss_class_cls))
+                    logfile.write('Loss Detector regression: {}\n '.format(loss_class_regr))
+                    logfile.write('Loss Detector segmentation: {}\n '.format(loss_class_seg))
+                    logfile.write('Elapsed time: {}\n '.format(time.time() - start_time))
+
 
                 curr_loss = loss_rpn_cls + loss_rpn_regr + loss_class_cls + loss_class_regr + loss_class_seg
                 iter_num = 0

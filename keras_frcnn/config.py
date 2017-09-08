@@ -15,16 +15,17 @@ class Config:
         self.rot_90 = False
 
         # anchor box scales
-        self.anchor_box_scales = [128, 256, 512]
+        self.anchor_box_scales = [64,112,144, 256]
 
         # anchor box ratios
-        self.anchor_box_ratios = [[1, 1], [1, 2], [2, 1]]
+        self.anchor_box_ratios = [[1, 1],[2, 1],[1,2]]
 
         # size to resize the smallest side of the image
         self.im_size = 600
 
         # image channel-wise mean to subtract
-        self.img_channel_mean = [103.939, 116.779, 123.68]
+        #self.img_channel_mean = [103.939, 116.779, 123.68]
+        self.img_channel_mean = [ 52.87077519,  52.63451846,  52.45142654]
         self.img_scaling_factor = 1.0
 
         # number of ROIs at once

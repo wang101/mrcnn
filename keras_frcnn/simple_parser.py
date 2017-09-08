@@ -1,4 +1,5 @@
 import cv2
+import os
 import copy
 import pdb
 import numpy as np
@@ -7,7 +8,7 @@ import numpy as np
 def watershed(mname,class_name,img_shape):
     mask_img = cv2.imread(mname)
     gray_ = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
-    gray = np.uint8(np.round(cv2.resize(np.float32(gray_),img_shape)))
+    gray = np.uint8(np.round(cv2.resize(np.float32(gray_),(img_shape[1],img_shape[0]))))
 
     dist_transform = cv2.distanceTransform(gray, 1, 5)
     ret, sure_fg = cv2.threshold(dist_transform, 0.05 * dist_transform.max(), 255, 0)
@@ -66,9 +67,16 @@ def get_data(input_path):
 
         print('Parsing annotation files')
 
-        for line in f:
-            line_split = line.strip().split(',')
-            (filename,maskname,class_name) = line_split
+        #for line in f:
+        #    line_split = line.strip().split('####')
+        #    (filename,maskname,class_name) = line_split
+        fpath = '/afs/crc.nd.edu/user/h/hwang21/work/keras_my/data/img_train/'
+        mpath = '/afs/crc.nd.edu/user/h/hwang21/work/keras_my/data/mask_train/'
+        for fname in os.listdir(fpath):
+            mname = os.path.splitext(fname.split('/')[-1])[0]+'.png'
+            filename = os.path.join(fpath,fname)
+            maskname = os.path.join(mpath,mname)
+            class_name = 'node'
 
             if class_name not in classes_count:
                 classes_count[class_name] = 1
@@ -82,6 +90,7 @@ def get_data(input_path):
                 class_mapping[class_name] = len(class_mapping)
 
             if filename not in all_imgs:
+                print(filename)
                 all_imgs[filename] = {}
                 img = cv2.imread(filename)
 

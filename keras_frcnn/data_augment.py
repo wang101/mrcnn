@@ -18,22 +18,27 @@ def augment(img_data, config, augment=True):
 
         if config.use_horizontal_flips and np.random.randint(0, 2) == 0:
             img = cv2.flip(img, 1)
-            for bbox in img_data_aug['bboxes']:
+            for n,bbox in enumerate(img_data_aug['bboxes']):
                 x1 = bbox['x1']
                 x2 = bbox['x2']
                 bbox['x2'] = cols - x1
                 bbox['x1'] = cols - x2
+                masks = img_data_aug['masks'][n]
+                img_data_aug['masks'][n] = cv2.flip(masks,1)
 
         if config.use_vertical_flips and np.random.randint(0, 2) == 0:
             img = cv2.flip(img, 0)
-            for bbox in img_data_aug['bboxes']:
+            for n,bbox in enumerate(img_data_aug['bboxes']):
                 y1 = bbox['y1']
                 y2 = bbox['y2']
                 bbox['y2'] = rows - y1
                 bbox['y1'] = rows - y2
+                masks = img_data_aug['masks'][n]
+                img_data_aug['masks'][n] = cv2.flip(masks,0)
 
         if config.rot_90:
-            angle = np.random.choice([0,90,180,270],1)[0]
+            #angle = np.random.choice([0,90,180,270],1)[0]
+            angle = 180
             if angle == 270:
                 img = np.transpose(img, (1,0,2))
                 img = cv2.flip(img, 0)
@@ -45,7 +50,7 @@ def augment(img_data, config, augment=True):
             elif angle == 0:
                 pass
 
-            for bbox in img_data_aug['bboxes']:
+            for n,bbox in enumerate(img_data_aug['bboxes']):
                 x1 = bbox['x1']
                 x2 = bbox['x2']
                 y1 = bbox['y1']
@@ -60,6 +65,9 @@ def augment(img_data, config, augment=True):
                     bbox['x1'] = cols - x2
                     bbox['y2'] = rows - y1
                     bbox['y1'] = rows - y2
+                    masks = img_data_aug['masks'][n]
+                    img_data_aug['masks'][n]= cv2.flip(masks,-1)
+
                 elif angle == 90:
                     bbox['x1'] = rows - y2
                     bbox['x2'] = rows - y1
